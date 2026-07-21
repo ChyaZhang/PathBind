@@ -1,7 +1,3 @@
-<p align="center">
-    <img src="assets/pathbind_logo.png" width="140"/>
-</p>
-
 <h1 align="center">PathBind</h1>
 
 <p align="center">
