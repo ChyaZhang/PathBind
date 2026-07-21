@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-    <img src="assets/pathbind_overview.png" width="90%"/>
+    <img src="assets/pathbind_overview.pdf" width="90%"/>
 </p>
 
 ---
@@ -48,9 +48,6 @@ finer levels of pathology visual reasoning:
 | D4   | Spatial localization            |
 | D5   | Diagnostic reasoning            |
 | D6   | Staining and IHC interpretation |
-
-PathBind-VQA covers D1–D6; PathBind-PTA covers D1–D5 (the private atlas
-does not provide controlled staining/IHC samples).
 
 ---
 
