@@ -1,0 +1,7 @@
+torch>=2.1
+transformers>=4.45
+accelerate>=0.30
+qwen-vl-utils>=0.0.10
+Pillow>=10
+numpy>=1.24
+scipy>=1.10

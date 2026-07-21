@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.env
+
+# HF staging (data lives on HuggingFace, do not vendor here)
+hf_datasets/
+hf_repo/
+
+# Locally materialized data files (users build these from source datasets or HF)
+pathbind/data/PathBind-VQA/pathbind_vqa_1500.tsv
+pathbind/data/PathBind-Grounding/pathbind_grounding_500.jsonl
+pathbind/data/PathBind-PTA/pathbind_pta_600.tsv
+
+# Run outputs
+results/
+*.log
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
