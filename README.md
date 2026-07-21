@@ -1,4 +1,8 @@
-# <img src="assets/pathbind_logo.png" height="30px"/> PathBind
+<p align="center">
+    <img src="assets/pathbind_logo.png" width="140"/>
+</p>
+
+<h1 align="center">PathBind</h1>
 
 <p align="center">
     <em>A diagnostic benchmark for evaluating pathology vision-language models.</em>
@@ -17,7 +21,7 @@
 </p>
 
 <p align="center">
-    <img src="assets/pathbind_overview.pdf" width="90%"/>
+    <img src="assets/pathbind_overview.png" width="90%"/>
 </p>
 
 ---
