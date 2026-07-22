@@ -1,6 +1,5 @@
 """Prompt templates used to evaluate PathBind.
 
-Taken verbatim from AAAI submission appendix (Figures E.5, E.6, D.2).
 Non-thinking models (e.g., LLaVA-1.5 family) may strip the <think>...</think>
 instruction; only the <answer>X</answer> tag is required for scoring.
 """
