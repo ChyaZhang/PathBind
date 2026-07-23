@@ -37,7 +37,7 @@ from .prompts import ATTN_PROMPT
 
 
 # ------------------------------------------------------------------ #
-# Attention-map utilities (paper appendix C.1–C.2)
+# Attention-map utilities
 # ------------------------------------------------------------------ #
 def _mid_third_layers(n_layers: int) -> list[int]:
     lo = n_layers // 3
@@ -70,7 +70,7 @@ def _heatmap_to_mask(heat_2d: np.ndarray, target_hw: tuple[int, int],
     heat -= heat.min()
     if heat.max() > 0:
         heat /= heat.max()
-    # Bilinear upsample to (H, W)
+
     H, W = target_hw
     ph, pw = heat.shape
     ys = np.linspace(0, ph - 1, H)
