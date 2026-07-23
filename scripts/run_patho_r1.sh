@@ -3,7 +3,7 @@
 # Edit CKPT and paths to your local layout.
 
 set -e
-CKPT=${CKPT:-/9_data/zcy/models/Patho-R1}
+CKPT=${CKPT:-./Patho-R1}
 GPUS=${GPUS:-0}
 OUT_DIR=${OUT_DIR:-results/patho-r1}
 mkdir -p "$OUT_DIR"
