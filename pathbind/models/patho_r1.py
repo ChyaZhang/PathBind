@@ -22,7 +22,7 @@ from typing import Any
 import torch
 
 
-DEFAULT_CKPT = "/9_data/zcy/models/Patho-R1"
+DEFAULT_CKPT = "./Patho-R1"
 
 
 class PathoR1:
