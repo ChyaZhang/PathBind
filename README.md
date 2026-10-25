@@ -152,7 +152,21 @@ Then pass `--model_module pathbind.models.<yours>` to the evaluators.
 
 ## ✒️ Citation
 
-Coming soon.
+If you find PathBind useful, please cite:
+
+```bibtex
+@misc{zhang2026pathbind,
+  title         = {Do Pathology Vision-Language Models Truly See Pathology?},
+  author        = {Zhang, Chengyang and Zhang, Wenchuan and Li, Bo and Liu, Xinyu and
+                   Yang, Jiaming and Li, Mengran and Deng, Chenxun and Chen, Jie and
+                   Zhang, Yang and Ju, Wei and Yi, Yuhao and Bu, Hong and Lv, Jiancheng},
+  year          = {2026},
+  eprint        = {2607.21065},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CV},
+  url           = {https://arxiv.org/abs/2607.21065}
+}
+```
 
 ---
 
