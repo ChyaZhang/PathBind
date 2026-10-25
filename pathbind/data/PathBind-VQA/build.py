@@ -1,126 +1,185 @@
-"""Rebuild PathBind-VQA locally from the shipped sample-id manifest.
+"""Rebuild PathBind-VQA locally from the upstream releases + the shipped crosswalk.
 
 PathBind-VQA does NOT redistribute question/option/image content of its five
-public sources (PathMMU, Path-VQA, Quilt-VQA, MedXpert-Path, OmniMed-Bright).
-You must first download those benchmarks yourself, then run this script with
-each benchmark's local directory to materialize the 1{,}500-sample TSV.
+public sources. Download them yourself (revisions pinned in the crosswalk),
+then run this script to materialize the 1,500-sample TSV.
 
-The manifest (pathbind_vqa_1500_manifest.tsv) contains only:
-    index,dimension,source_dataset,source_sample_id,answer_type
+pathbind_vqa_1500_crosswalk.tsv maps every manifest row to one upstream QA
+record (row order == manifest order):
 
+    row, index, dimension, source_dataset, answer_type,
+    upstream_repo, upstream_revision, upstream_split,
+    upstream_qa_id, upstream_image, question_sha1
+
+  pathmmu   jamessyx/PathMMU            data.json[subset]["test"][No]
+  pathvqa   flaviagiammarino/path-vqa   0-based row of the `test` split
+                                        (shards concatenated in file order,
+                                        before any yes/no filtering)
+  quiltvqa  wisdomik/Quilt_VQA          quiltvqa_test_w_ans.json, record `id`
+  medxpert  TsinghuaC3I/MedXpertQA      MM/test.jsonl, record `id`
+  omnimed   OmniMedVQA (Restricted)     "BRIGHT Challenge.json", question_id
+                                        BRIGHT Challenge_NNNN (= list position)
+
+question_sha1 = sha1(lower(whitespace-normalized question))[:12]; every row is
+checked against it, so a wrong match fails loudly instead of silently.
+
+Expected local layouts (images may sit anywhere below each dir; they are
+looked up by file name):
+    --pathmmu_dir   data.json + unzipped images.zip
+    --pathvqa_dir   the HF repo snapshot (data/test-*.parquet); needs pandas
+    --quiltvqa_dir  quiltvqa_test_w_ans.json + unzipped quilt_vqa.zip
+    --medxpert_dir  MM/test.jsonl + unzipped images.zip
+    --omnimed_dir   OmniMedVQA root (QA_information/.../BRIGHT Challenge.json
+                    + Images/)
+
+Every source dir is optional; rows of a missing source (or with a missing
+image) are skipped and reported.
 
 Usage:
-    python build.py \\
-        --pathmmu_dir  <local PathMMU images+questions>  \\
-        --pathvqa_dir  <local Path-VQA>  \\
-        --quiltvqa_dir <local Quilt-VQA>  \\
-        --omnimed_dir  <local OmniMed-Bright>  \\
-        --medxpert_dir <local MedXpert-Path>  \\
-        --out          pathbind_vqa_1500.tsv
+    python build.py --pathmmu_dir ... --pathvqa_dir ... --quiltvqa_dir ... \\
+        --medxpert_dir ... --omnimed_dir ... --out pathbind_vqa_1500.tsv
 """
 import argparse
 import csv
+import glob
+import hashlib
 import json
 import sys
+from collections import Counter
 from pathlib import Path
 
-MANIFEST = Path(__file__).with_name("pathbind_vqa_1500_manifest.tsv")
-
-SOURCE_LOADERS = {
-    # Each loader must return a dict:
-    #   sample_id -> {"question": str, "options": [str, ...], "answer": str,
-    #                 "answer_type": "mcq"|"yn", "image_path": str}
-    # Fill this in per source. The stubs below assume the local layout used by
-    # our reference reimplementation; adjust to your local copy as needed.
-}
+CROSSWALK = Path(__file__).with_name("pathbind_vqa_1500_crosswalk.tsv")
+LETTERS = "ABCDEFGHIJKLMNOP"
 
 
-def load_pathmmu(root: Path) -> dict:
-    """PathMMU test-tiny + test-all. Expects `samples.jsonl` and `images/`."""
-    samples_path = root / "samples.jsonl"
-    if not samples_path.exists():
-        raise FileNotFoundError(samples_path)
-    out = {}
-    for line in samples_path.open():
-        s = json.loads(line)
-        out[s["sample_id"]] = {
-            "question": s["question"],
-            "options": s["options"],
-            "answer": s["answer"],
-            "answer_type": "mcq",
-            "image_path": str(root / "images" / f"{s['sample_id']}.jpg"),
-        }
-    return out
+def qhash(q: str) -> str:
+    return hashlib.sha1(" ".join(q.split()).lower().encode()).hexdigest()[:12]
 
 
-def load_pathvqa(root: Path) -> dict:
-    """Path-VQA closed. Uses only yes/no subset."""
-    return load_pathmmu(root)   # same layout
+def image_index(root: Path) -> dict:
+    """file name and stem -> path, for every file below root."""
+    idx = {}
+    for p in root.rglob("*"):
+        if p.is_file():
+            idx.setdefault(p.name, p)
+            idx.setdefault(p.stem, p)
+    return idx
 
 
-def load_quiltvqa(root: Path) -> dict:
-    return load_pathmmu(root)
+# Each loader returns fetch(crosswalk_row) -> (question, options, answer, image_path)
+# and raises KeyError when the image is not available locally.
+
+def load_pathmmu(root: Path, out_img: Path):
+    data = json.load((root / "data.json").open())
+    imgs = image_index(root)
+
+    def fetch(c):
+        subset, split = c["upstream_split"].split("/")
+        r = data[subset][split][int(c["upstream_qa_id"])]
+        opts = [o[3:] if o[1:3] == ") " else o for o in r["options"]]
+        return r["question"], opts, r["answer"][0], str(imgs[r["img"]])
+    return fetch
 
 
-def load_omnimed(root: Path) -> dict:
-    return load_pathmmu(root)
+def load_pathvqa(root: Path, out_img: Path):
+    import pandas as pd
+    files = sorted(glob.glob(str(root / "data" / "test-*.parquet")))
+    df = pd.concat([pd.read_parquet(f) for f in files], ignore_index=True)
+
+    def fetch(c):
+        n = int(c["upstream_qa_id"])
+        p = out_img / f"pathvqa_test_{n}.jpg"
+        if not p.exists():
+            p.write_bytes(df.image[n]["bytes"])
+        return df.question[n], [], df.answer[n].strip().lower(), str(p)
+    return fetch
 
 
-def load_medxpert(root: Path) -> dict:
-    return load_pathmmu(root)
+def load_quiltvqa(root: Path, out_img: Path):
+    data = {r["id"]: r for r in json.load((root / "quiltvqa_test_w_ans.json").open())}
+    imgs = image_index(root)
+
+    def fetch(c):
+        r = data[int(c["upstream_qa_id"])]
+        return r["question"], [], r["yes_no_answer"].strip().lower(), str(imgs[r["image"]])
+    return fetch
+
+
+def load_medxpert(root: Path, out_img: Path):
+    data = {r["id"]: r for r in map(json.loads, (root / "MM" / "test.jsonl").open())}
+    imgs = image_index(root)
+
+    def fetch(c):
+        r = data[c["upstream_qa_id"]]
+        q = r["question"].split("\nAnswer Choices:")[0]   # options are listed separately
+        return q, list(r["options"].values()), r["label"], str(imgs[c["upstream_image"]])
+    return fetch
+
+
+def load_omnimed(root: Path, out_img: Path):
+    (qa,) = root.rglob("BRIGHT Challenge.json")
+    data = json.load(qa.open())
+    imgs = image_index(root)
+
+    def fetch(c):
+        r = data[int(c["upstream_qa_id"].rsplit("_", 1)[1])]
+        opts = [r[f"option_{L}"] for L in "ABCD" if r.get(f"option_{L}")]
+        ans = LETTERS[opts.index(r["gt_answer"])]
+        return r["question"], opts, ans, str(imgs[c["upstream_image"]])
+    return fetch
 
 
 LOADER_REGISTRY = {
     "pathmmu": load_pathmmu,
     "pathvqa": load_pathvqa,
     "quiltvqa": load_quiltvqa,
-    "omnimed": load_omnimed,
     "medxpert": load_medxpert,
+    "omnimed": load_omnimed,
 }
 
 
 def main():
     p = argparse.ArgumentParser()
     for k in LOADER_REGISTRY:
-        p.add_argument(f"--{k}_dir", type=Path, required=True,
-                       help=f"Local root of the {k} benchmark")
+        p.add_argument(f"--{k}_dir", type=Path, help=f"Local root of the {k} release")
     p.add_argument("--out", type=Path,
                    default=Path(__file__).with_name("pathbind_vqa_1500.tsv"))
     args = p.parse_args()
+    out_img = args.out.with_suffix(".images")
+    out_img.mkdir(parents=True, exist_ok=True)
 
-    print(f"[pathbind-vqa] loading 5 source benchmarks ...", file=sys.stderr)
-    sources = {k: fn(getattr(args, f"{k}_dir"))
-               for k, fn in LOADER_REGISTRY.items()}
-    for k, d in sources.items():
-        print(f"    {k}: {len(d)} samples", file=sys.stderr)
+    fetchers = {}
+    for k, fn in LOADER_REGISTRY.items():
+        d = getattr(args, f"{k}_dir")
+        if d is not None:
+            print(f"[pathbind-vqa] loading {k} from {d}", file=sys.stderr)
+            fetchers[k] = fn(d, out_img)
 
-    print(f"[pathbind-vqa] reading manifest {MANIFEST} ...", file=sys.stderr)
-    manifest_rows = list(csv.DictReader(MANIFEST.open(), delimiter="\t"))
-    print(f"    manifest rows: {len(manifest_rows)}", file=sys.stderr)
-
-    hdr = ["index", "question"] + list("ABCDEFGHIJKLMNOP") + [
-        "image_path", "answer", "answer_type", "source_dataset", "dimension"
-    ]
-    out_rows = []
-    missing = []
-    for m in manifest_rows:
-        ds = m["source_dataset"]
-        sid = m["source_sample_id"]
-        rec = sources.get(ds, {}).get(sid)
-        if rec is None:
-            missing.append((ds, sid))
+    crosswalk = list(csv.DictReader(CROSSWALK.open(), delimiter="\t"))
+    hdr = ["index", "question", *LETTERS, "image_path", "answer",
+           "answer_type", "source_dataset", "dimension"]
+    out_rows, missing = [], Counter()
+    for c in crosswalk:
+        ds = c["source_dataset"]
+        if ds not in fetchers:
+            missing[(ds, "source dir not given")] += 1
             continue
-        opts = rec["options"] + [""] * (16 - len(rec["options"]))
-        out_rows.append([
-            m["index"], rec["question"], *opts,
-            rec["image_path"], rec["answer"], rec["answer_type"],
-            ds, m["dimension"],
-        ])
+        try:
+            q, opts, ans, img = fetchers[ds](c)
+        except KeyError:
+            missing[(ds, "image not found")] += 1
+            continue
+        if qhash(q) != c["question_sha1"]:
+            sys.exit(f"question_sha1 mismatch at row {c['row']} ({c['index']}): "
+                     f"wrong upstream revision?")
+        # newlines -> spaces, as in the TSVs we evaluated on
+        q, *opts = [t.replace("\n", " ").strip() for t in (q, *opts)]
+        out_rows.append([c["index"], q, *opts, *[""] * (16 - len(opts)),
+                         img, ans, c["answer_type"], ds, c["dimension"]])
 
-    print(f"[pathbind-vqa] materialized: {len(out_rows)}, missing: {len(missing)}",
-          file=sys.stderr)
-    if missing:
-        print(f"    first 10 missing: {missing[:10]}", file=sys.stderr)
+    print(f"[pathbind-vqa] materialized {len(out_rows)}/{len(crosswalk)}", file=sys.stderr)
+    for (ds, why), n in sorted(missing.items()):
+        print(f"    skipped {n:4d} {ds}: {why}", file=sys.stderr)
 
     with args.out.open("w", newline="") as f:
         w = csv.writer(f, delimiter="\t", lineterminator="\n")

@@ -11,6 +11,7 @@ hf_repo/
 
 # Locally materialized data files (users build these from source datasets or HF)
 pathbind/data/PathBind-VQA/pathbind_vqa_1500.tsv
+pathbind/data/PathBind-VQA/pathbind_vqa_1500.images/
 pathbind/data/PathBind-Grounding/pathbind_grounding_500.jsonl
 pathbind/data/PathBind-PTA/pathbind_pta_600.tsv
 

@@ -68,7 +68,8 @@ The resulting directory looks like:
 ```
 PathBind_data/
 ├── PathBind-VQA/
-│   └── manifest.tsv               # sample IDs only
+│   ├── manifest.tsv               # sample IDs only
+│   └── crosswalk.tsv              # row -> exact upstream QA record
 ├── PathBind-PTA/
 │   └── pathbind_pta_600.tsv       # self-contained, base64 JPEGs inline
 └── PathBind-Grounding/
@@ -82,7 +83,10 @@ Path-VQA, Quilt-VQA, MedXpert-Path, OmniMed-Bright for VQA; PathVG for
 Grounding) yourself and materialize the full files:
 
 ```bash
-# VQA: builds pathbind_vqa_1500.tsv from your local source copies
+# VQA: builds pathbind_vqa_1500.tsv from the upstream releases, located via
+# pathbind/data/PathBind-VQA/pathbind_vqa_1500_crosswalk.tsv (pinned HF
+# revisions, splits and QA ids; see the build.py docstring for layouts).
+# Any subset of the five sources works; missing rows are reported.
 python pathbind/data/PathBind-VQA/build.py \
     --pathmmu_dir  /path/to/PathMMU  \
     --pathvqa_dir  /path/to/Path-VQA \
